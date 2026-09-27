@@ -80,7 +80,7 @@ class IsaacROSNvBloxTest(IsaacROSBaseTest):
 
     @IsaacROSBaseTest.for_each_test_case('rosbags')
     def test_nvblox_node(self, test_folder):
-        timeout = 30
+        TIMEOUT = 30
         received_messages = {}
         self.generate_namespace_lookup(['nvblox_node/mesh', 'nvblox_node/static_map_slice'],
                                        _TEST_CASE_NAMESPACE)
@@ -91,7 +91,7 @@ class IsaacROSNvBloxTest(IsaacROSBaseTest):
             accept_multiple_messages=True)
 
         try:
-            end_time = time.time() + timeout
+            end_time = time.time() + TIMEOUT
             done = False
 
             while time.time() < end_time:

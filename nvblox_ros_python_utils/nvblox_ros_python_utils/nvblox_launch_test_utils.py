@@ -46,9 +46,9 @@ def check_service_availability(
         The timeout duration, specified in seconds
 
     """
-    end_time = time.time() + timeout
+    END_TIME = time.time() + timeout
     while not service_client.wait_for_service(timeout_sec=1.0):
-        instance.assertLess(time.time(), end_time,
+        instance.assertLess(time.time(), END_TIME,
                             f'Timeout occurred while waiting for the {service_name} service')
         instance.node.get_logger().info(f'{service_name} service not available, waiting again...')
 

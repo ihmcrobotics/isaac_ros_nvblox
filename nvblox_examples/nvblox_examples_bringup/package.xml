@@ -21,7 +21,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>nvblox_examples_bringup</name>
-  <version>5.0.0</version>
+  <version>4.6.0</version>
   <description>Launchfiles for nvblox examples</description>
 
   <maintainer email="isaac-ros-maintainers@nvidia.com">Isaac ROS Maintainers</maintainer>
@@ -50,7 +50,7 @@
   <exec_depend>nvblox_ros</exec_depend>
 
   <!-- Visual SLAM -->
-  <exec_depend>isaac_ros_cuvslam</exec_depend>
+  <exec_depend>isaac_ros_visual_slam</exec_depend>
 
   <!-- Segmentation -->
   <depend>isaac_ros_peoplesemseg_models_install</depend>

@@ -17,11 +17,11 @@
 
 from typing import List
 
-import isaac_ros_launch_utils as lu
 import isaac_ros_launch_utils.all_types as lut
+import isaac_ros_launch_utils as lu
 
-from nvblox_ros_python_utils.nvblox_constants import NVBLOX_CONTAINER_NAME
 from nvblox_ros_python_utils.nvblox_launch_utils import NvbloxMode
+from nvblox_ros_python_utils.nvblox_constants import NVBLOX_CONTAINER_NAME
 
 
 def add_nvblox_carter_navigation(args: lu.ArgumentContainer) -> List[lut.Action]:

@@ -19,9 +19,9 @@
 
 import json
 
-from nvblox_msgs.msg import SemanticLabelsStamped
 import rclpy
 from rclpy.node import Node
+from nvblox_msgs.msg import SemanticLabelsStamped
 from std_msgs.msg import String
 
 
@@ -48,28 +48,29 @@ class LabelsConverter(Node):
             self.init_camera(camera_2_name)
 
     def init_camera(self, camera_name: str) -> None:
-        """Initialize publishers and subscribers for a camera.
-
+        '''
+        Initialize publishers and subscribers for a camera
         Args:
             camera_name (str): The name of the camera
-        """
+        '''
         # Publisher
         labels_publisher = self.create_publisher(
-            SemanticLabelsStamped, f'/semantic_conversion/{camera_name}/labels_stamped', 10)
+            SemanticLabelsStamped, f"/semantic_conversion/{camera_name}/labels_stamped", 10)
 
         # Subscriber
         def on_camera_labels(msg):
             return self.on_labels(labels_publisher, msg)
 
-        self.create_subscription(String, f'/{camera_name}/semantics/semantic_labels',
+        self.create_subscription(String, f"/{camera_name}/semantics/semantic_labels",
                                  on_camera_labels, 10)
 
     def on_labels(self, publisher, labels_string: String) -> None:
-        """Parse the labels string message into a custom message with a Header.
+        '''
+        Parse the string message for the labels and turn it into a custom message with Header
 
         Args:
             labels_string (String): String message coming out of IsaacSim
-        """
+        '''
         # Load the string with json
         labels_data = json.loads(labels_string.data)
         # Get the timestamp issue

@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,9 +16,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 cmake_minimum_required(VERSION 3.10)
-# C is required because the linked rosidl typesupport imported targets
-# (via ${<pkg>_TARGETS}) propagate C compile features.
-project(nvblox_ros LANGUAGES C CXX CUDA)
+project(nvblox_ros LANGUAGES CXX CUDA)
+
+# Default to C++17
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
 
 # Default to release build
 if(NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
@@ -55,12 +58,8 @@ set(USE_SYSTEM_GFLAGS true)
 set(USE_SYSTEM_GTEST true)
 set(USE_SYSTEM_BENCHMARK true)
 
-# The core nvblox lib is built together with nvblox_ros.
-# ament_cmake defaults BUILD_SHARED_LIBS to ON, which would turn nvblox_core's
-# vendored sqlite3 (add_library with no explicit type) into a shared library;
-# CMake then refuses to install(EXPORT) nvblox_lib because its private shared
-# dependency is in no export set. Build the core subtree with its upstream
-# default (static, PIC-enabled sqlite3 linked privately into nvblox_lib).
+# The core nvblox lib is built together with nvblox_ros
+# Keep the vendored sqlite dependency static, as expected by nvblox exports.
 set(_nvblox_ros_build_shared_libs ${BUILD_SHARED_LIBS})
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(nvblox_core)
@@ -91,7 +90,8 @@ find_package(cv_bridge REQUIRED)
 find_package(nvblox_ros_common REQUIRED)
 find_package(isaac_ros_common REQUIRED)
 find_package(CUDAToolkit REQUIRED)
-find_package(cuda_buffer REQUIRED)
+find_package(isaac_ros_nitros REQUIRED)
+find_package(isaac_ros_nitros_image_type REQUIRED)
 find_package(message_filters REQUIRED)
 
 #############
@@ -121,34 +121,27 @@ add_library(${PROJECT_NAME}_lib SHARED
 set_nvblox_compiler_options(${PROJECT_NAME}_lib)
 target_link_libraries(${PROJECT_NAME}_lib PUBLIC nvblox_lib nvblox_eigen nvblox_datasets nvblox_fuser pthread glog)
 target_link_libraries(${PROJECT_NAME}_lib PRIVATE nvblox_gpu_hash nvblox_stdgpu)
-# This ROS distro drops ament_target_dependencies; link the modern imported
-# targets directly. ${<pkg>_TARGETS} carries transitive include dirs (e.g.
-# cuda_buffer pulls in rosidl_buffer), populated by ament_auto_find_build_dependencies.
-target_link_libraries(${PROJECT_NAME}_lib PUBLIC
-  rclcpp::rclcpp
-  rclcpp_components::component
-  rosbag2_cpp::rosbag2_cpp
-  ${sensor_msgs_TARGETS}
-  ${geometry_msgs_TARGETS}
-  ${nvblox_msgs_TARGETS}
-  ${std_msgs_TARGETS}
-  ${nav_msgs_TARGETS}
-  ${visualization_msgs_TARGETS}
-  ${std_srvs_TARGETS}
-  tf2_ros::tf2_ros
-  tf2_eigen::tf2_eigen
-  message_filters::message_filters
-  cv_bridge::cv_bridge
-  ${cuda_buffer_TARGETS}
-  ${nvblox_ros_common_LIBRARIES}
-  ${isaac_ros_common_LIBRARIES}
-)
-# nvblox_ros_common and isaac_ros_common use old-style ament exports
-# (ament_export_libraries/include_directories, no ${pkg}_TARGETS), so their
-# include directories must be added explicitly.
-target_include_directories(${PROJECT_NAME}_lib PUBLIC
-  ${nvblox_ros_common_INCLUDE_DIRS}
-  ${isaac_ros_common_INCLUDE_DIRS}
+ament_target_dependencies(${PROJECT_NAME}_lib
+  PUBLIC
+  rclcpp
+  rclcpp_components
+  rosbag2_cpp
+  sensor_msgs
+  geometry_msgs
+  nvblox_msgs
+  std_msgs
+  nav_msgs
+  visualization_msgs
+  std_srvs
+  tf2_ros
+  tf2_eigen
+  message_filters
+  visualization_msgs
+  cv_bridge
+  nvblox_ros_common
+  isaac_ros_nitros
+  isaac_ros_nitros_image_type
+  isaac_ros_common
 )
 target_include_directories(${PROJECT_NAME}_lib PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -291,7 +284,7 @@ ament_export_dependencies(
   libstatistics_collector
   visualization_msgs
   cv_bridge
-  cuda_buffer
+  isaac_ros_nitros
   nvblox_ros_common
   nvblox_msgs
   std_srvs

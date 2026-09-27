@@ -18,14 +18,16 @@
 import os
 import pathlib
 
-import isaac_ros_launch_utils as lu
-from isaac_ros_test import IsaacROSBaseTest
-from launch import LaunchDescription
-import launch_testing
-from nvblox_msgs.msg import DistanceMapSlice, Mesh
 import pytest
 
-BAG_NAME = 'galileo_people_3_2'
+import launch_testing
+from launch import LaunchDescription
+
+from isaac_ros_test import IsaacROSBaseTest
+import isaac_ros_launch_utils as lu
+from nvblox_msgs.msg import DistanceMapSlice, Mesh
+
+BAG_NAME = "galileo_people_3_2"
 TIMEOUT = 120
 BAG_PATH = os.path.join(lu.get_isaac_ros_ws_path(), 'isaac_ros_assets',
                         'isaac_ros_nvblox', BAG_NAME)
@@ -56,7 +58,7 @@ class IsaacROSNvBloxTest(IsaacROSBaseTest):
     def test_realsense_dynamics(self):
         received_messages = {}
 
-        assert os.path.exists(BAG_PATH), 'Test rosbag does not exist. Failing.'
+        assert os.path.exists(BAG_PATH), "Test rosbag does not exist. Failing."
 
         subs = self.create_logging_subscribers(
             [('/nvblox_node/mesh', Mesh),

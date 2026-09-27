@@ -63,9 +63,8 @@ void NvbloxCostmapLayer::onInitialize()
 
   // Add subscribers to the nvblox message.
   slice_sub_ = node->create_subscription<nvblox_msgs::msg::DistanceMapSlice>(
-    nvblox_map_slice_topic,
-    std::bind(&NvbloxCostmapLayer::sliceCallback, this, std::placeholders::_1),
-    rclcpp::QoS(1));
+    nvblox_map_slice_topic, 1,
+    std::bind(&NvbloxCostmapLayer::sliceCallback, this, std::placeholders::_1));
 
   // Init transform and listener.
   T_G_S_ = Eigen::Isometry2f::Identity();

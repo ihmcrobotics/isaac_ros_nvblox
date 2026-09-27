@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-// Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -54,9 +54,9 @@ struct Visitor : Ts ... { using Ts::operator() ...; };
 template<class ... Ts>
 Visitor(Ts ...)->Visitor<Ts...>;
 
-rclcpp::Time getTimestamp(const sensor_msgs::msg::Image & image)
+rclcpp::Time getTimestamp(const NitrosView & image)
 {
-  return rclcpp::Time(image.header.stamp.sec, image.header.stamp.nanosec, RCL_ROS_TIME);
+  return rclcpp::Time(image.timestamp_sec, image.timestamp_nsec, RCL_ROS_TIME);
 }
 
 }  // namespace
@@ -174,6 +174,13 @@ NvbloxNode::~NvbloxNode()
     }
   }
 
+  // Having the destructor destroying NITROS types may fail if the process-wide NITROS context
+  // has been released elsewhere. This is out of control of this node. To avoid crashes, we refrain
+  // from deleting them and instead relay on the OS for memory cleanup. Note that this will lead to
+  // memory leaks if several classes are instantiated in the same process.
+  depth_image_queue_.release();
+  color_image_queue_.release();
+
   RCLCPP_INFO_STREAM(get_logger(), "Timing statistics: \n" << nvblox::timing::Timing::Print());
   RCLCPP_INFO_STREAM(get_logger(), "Rates statistics: \n" << nvblox::timing::Rates::Print());
   RCLCPP_INFO_STREAM(get_logger(), "Delay statistics: \n" << nvblox::timing::Delays::Print());
@@ -235,12 +242,8 @@ void NvbloxNode::subscribeToTopics()
     isaac_ros::common::AddQosParameter(*this, kDefaultInputQos_, "input_qos");
   std::string input_qos_str = kDefaultInputQos_;
   get_parameter("input_qos", input_qos_str);
+  const rmw_qos_profile_t input_qos_profile = input_qos.get_rmw_qos_profile();
   RCLCPP_INFO_STREAM(get_logger(), "Subscribing input topics with QoS: " << input_qos_str);
-
-  // Accept GPU-backed image buffers (e.g. CUDA) while remaining compatible
-  // with CPU-backed publishers; from_input_buffer promotes CPU buffers as needed.
-  rclcpp::SubscriptionOptions image_sub_options;
-  image_sub_options.acceptable_buffer_backends = "any";
 
   // We subscribe to the masks if we enable segmentation
   // We call depth/color+mask queue if segmentation is enabled.
@@ -252,22 +255,22 @@ void NvbloxNode::subscribeToTopics()
       const std::string base_name_depth(kDepthTopicBaseNames[i]);
       depth_camera_info_subs_.emplace_back(
         std::make_shared<::message_filters::Subscriber<sensor_msgs::msg::CameraInfo>>(
-          this, base_name_depth + "/camera_info", input_qos));
+          this, base_name_depth + "/camera_info", input_qos_profile));
 
       depth_image_subs_.emplace_back(
-        std::make_shared<::message_filters::Subscriber<sensor_msgs::msg::Image>>(
+        std::make_shared<::message_filters::Subscriber<NitrosView>>(
           this, base_name_depth + "/image",
-          input_qos, image_sub_options));
+          input_qos_profile));
       if (params_.use_segmentation) {
         const std::string base_name_seg_depth(kSegTopicBaseNames[i]);
         segmentation_camera_info_subs_.emplace_back(
           std::make_shared<::message_filters::Subscriber<sensor_msgs::msg::CameraInfo>>(
-            this, base_name_seg_depth + "/camera_info", input_qos));
+            this, base_name_seg_depth + "/camera_info", input_qos_profile));
 
         segmentation_image_subs_.emplace_back(
-          std::make_shared<::message_filters::Subscriber<sensor_msgs::msg::Image>>(
+          std::make_shared<::message_filters::Subscriber<NitrosView>>(
             this, base_name_seg_depth + "/image",
-            input_qos, image_sub_options));
+            input_qos_profile));
         // Sync depth and segmentation images with their camera infos
         timesync_depth_mask_.emplace_back(
           std::make_shared<image_mask_approx_sync>(
@@ -300,22 +303,22 @@ void NvbloxNode::subscribeToTopics()
       const std::string base_name_color(kColorTopicBaseNames[i]);
       color_camera_info_subs_.emplace_back(
         std::make_shared<::message_filters::Subscriber<sensor_msgs::msg::CameraInfo>>(
-          this, base_name_color + "/camera_info", input_qos));
+          this, base_name_color + "/camera_info", input_qos_profile));
 
       color_image_subs_.emplace_back(
-        std::make_shared<::message_filters::Subscriber<sensor_msgs::msg::Image>>(
+        std::make_shared<::message_filters::Subscriber<NitrosView>>(
           this, base_name_color + "/image",
-          input_qos, image_sub_options));
+          input_qos_profile));
       if (params_.use_segmentation) {
         const std::string base_name_seg_color(kSegTopicBaseNames[i]);
         segmentation_camera_info_subs_.emplace_back(
           std::make_shared<::message_filters::Subscriber<sensor_msgs::msg::CameraInfo>>(
-            this, base_name_seg_color + "/camera_info", input_qos));
+            this, base_name_seg_color + "/camera_info", input_qos_profile));
 
         segmentation_image_subs_.emplace_back(
-          std::make_shared<::message_filters::Subscriber<sensor_msgs::msg::Image>>(
+          std::make_shared<::message_filters::Subscriber<NitrosView>>(
             this, base_name_seg_color + "/image",
-            input_qos, image_sub_options));
+            input_qos_profile));
         // Sync color and segmentation images with their camera infos
         timesync_color_mask_.emplace_back(
           std::make_shared<image_mask_exact_sync>(
@@ -429,29 +432,29 @@ void NvbloxNode::advertiseServices()
   save_ply_service_ = create_service<nvblox_msgs::srv::FilePath>(
     "~/save_ply",
     std::bind(&NvbloxNode::savePly, this, std::placeholders::_1, std::placeholders::_2),
-    rclcpp::ServicesQoS());
+    rmw_qos_profile_services_default);
   save_map_service_ = create_service<nvblox_msgs::srv::FilePath>(
     "~/save_map",
     std::bind(&NvbloxNode::saveMap, this, std::placeholders::_1, std::placeholders::_2),
-    rclcpp::ServicesQoS());
+    rmw_qos_profile_services_default);
   load_map_service_ = create_service<nvblox_msgs::srv::FilePath>(
     "~/load_map",
     std::bind(&NvbloxNode::loadMap, this, std::placeholders::_1, std::placeholders::_2),
-    rclcpp::ServicesQoS());
+    rmw_qos_profile_services_default);
   save_rates_service_ = create_service<nvblox_msgs::srv::FilePath>(
     "~/save_rates",
     std::bind(&NvbloxNode::saveRates, this, std::placeholders::_1, std::placeholders::_2),
-    rclcpp::ServicesQoS());
+    rmw_qos_profile_services_default);
   save_timings_service_ = create_service<nvblox_msgs::srv::FilePath>(
     "~/save_timings",
     std::bind(&NvbloxNode::saveTimings, this, std::placeholders::_1, std::placeholders::_2),
-    rclcpp::ServicesQoS());
+    rmw_qos_profile_services_default);
   send_esdf_and_gradient_service_ = create_service<nvblox_msgs::srv::EsdfAndGradients>(
     "~/get_esdf_and_gradient",
     std::bind(
       &NvbloxNode::getEsdfAndGradientService, this, std::placeholders::_1,
       std::placeholders::_2),
-    rclcpp::ServicesQoS());
+    rmw_qos_profile_services_default);
 }
 
 void NvbloxNode::setupTimers()
@@ -465,9 +468,9 @@ void NvbloxNode::setupTimers()
 }
 
 void NvbloxNode::depthPlusMaskImageCallback(
-  const sensor_msgs::msg::Image::ConstSharedPtr & depth_image,
+  const NitrosViewPtr & depth_image,
   const sensor_msgs::msg::CameraInfo::ConstSharedPtr & depth_camera_info,
-  const sensor_msgs::msg::Image::ConstSharedPtr & seg_image,
+  const NitrosViewPtr & seg_image,
   const sensor_msgs::msg::CameraInfo::ConstSharedPtr & seg_camera_info)
 {
   timing::Timer tick_timer("ros/depth_image_callback");
@@ -485,7 +488,7 @@ void NvbloxNode::depthPlusMaskImageCallback(
 }
 
 void NvbloxNode::depthImageCallback(
-  const sensor_msgs::msg::Image::ConstSharedPtr & depth_image,
+  const NitrosViewPtr & depth_image,
   const sensor_msgs::msg::CameraInfo::ConstSharedPtr & depth_camera_info)
 {
   timing::Timer tick_timer("ros/depth_image_callback");
@@ -503,9 +506,9 @@ void NvbloxNode::depthImageCallback(
 }
 
 void NvbloxNode::colorPlusMaskImageCallback(
-  const sensor_msgs::msg::Image::ConstSharedPtr & color_image,
+  const NitrosViewPtr & color_image,
   const sensor_msgs::msg::CameraInfo::ConstSharedPtr & color_camera_info,
-  const sensor_msgs::msg::Image::ConstSharedPtr & seg_image,
+  const NitrosViewPtr & seg_image,
   const sensor_msgs::msg::CameraInfo::ConstSharedPtr & seg_camera_info)
 {
   timing::Timer tick_timer("ros/color_image_callback");
@@ -523,7 +526,7 @@ void NvbloxNode::colorPlusMaskImageCallback(
 }
 
 void NvbloxNode::colorImageCallback(
-  const sensor_msgs::msg::Image::ConstSharedPtr & color_image,
+  const NitrosViewPtr & color_image,
   const sensor_msgs::msg::CameraInfo::ConstSharedPtr & color_camera_info)
 {
   timing::Timer tick_timer("ros/color_image_callback");
@@ -671,15 +674,15 @@ bool NvbloxNode::isPoseAvailable(const ImageTypeVariant & variant_msg)
     Visitor{
       // Image
       [this](const ImageMsgTuple & msg) -> bool {
-        const sensor_msgs::msg::Image & img_msg = *(std::get<kMsgTupleImageIdx>(msg));
-        return this->canTransform(img_msg.header.frame_id, getTimestamp(img_msg));
+        const NitrosView & img_msg = *(std::get<kMsgTupleImageIdx>(msg));
+        return this->canTransform(img_msg.frame_id, getTimestamp(img_msg));
       },
       // Image + Mask
       [this](const ImageSegmentationMaskMsgTuple & msg) -> bool {
-        const sensor_msgs::msg::Image & img_msg = *std::get<kMsgTupleImageIdx>(msg);
-        const sensor_msgs::msg::Image & mask_msg = *std::get<kMsgTupleMaskIdx>(msg);
-        return this->canTransform(img_msg.header.frame_id, getTimestamp(img_msg)) &&
-               this->canTransform(mask_msg.header.frame_id, getTimestamp(mask_msg));
+        const NitrosView & img_msg = *std::get<kMsgTupleImageIdx>(msg);
+        const NitrosView & mask_msg = *std::get<kMsgTupleMaskIdx>(msg);
+        return this->canTransform(img_msg.frame_id, getTimestamp(img_msg)) &&
+               this->canTransform(mask_msg.frame_id, getTimestamp(mask_msg));
       }
     }, variant_msg);
 }
@@ -933,9 +936,9 @@ NvbloxNode::ImageMsgOptionalMaskMsgTuple NvbloxNode::decomposeImageTypeVariant(
   const ImageTypeVariant & variant_msg)
 {
   // (Optional) message parts.
-  sensor_msgs::msg::Image::ConstSharedPtr img_ptr;
+  NitrosViewPtr img_ptr;
   sensor_msgs::msg::CameraInfo::ConstSharedPtr camera_info_msg;
-  std::optional<sensor_msgs::msg::Image::ConstSharedPtr> mask_img_opt;
+  std::optional<NitrosViewPtr> mask_img_opt;
   std::optional<sensor_msgs::msg::CameraInfo::ConstSharedPtr> mask_camera_info_opt;
 
   std::visit(
@@ -967,11 +970,11 @@ bool NvbloxNode::processDepthImage(const ImageTypeVariant & depth_msg)
   auto [depth_img_ptr, depth_camera_info_msg, mask_img_opt,
     mask_camera_info_opt] = decomposeImageTypeVariant(depth_msg);
 
-  const std::string depth_frame = depth_img_ptr->header.frame_id;
+  const std::string depth_frame = depth_img_ptr->frame_id;
   std::string mask_frame;
   rclcpp::Time mask_image_timestamp;
   if (mask_img_opt) {
-    mask_frame = mask_img_opt.value()->header.frame_id;
+    mask_frame = mask_img_opt.value()->frame_id;
     mask_image_timestamp = getTimestamp(*mask_img_opt.value());
   }
   // Check if the message is too soon, and if it is discard it
@@ -1022,7 +1025,7 @@ bool NvbloxNode::processDepthImage(const ImageTypeVariant & depth_msg)
     mask_camera = conversions::cameraFromMessage(*mask_camera_info_opt.value());
   }
   // Convert the depth image.
-  if (!conversions::depthImageFromImageBufferAsync(
+  if (!conversions::depthImageFromNitrosViewAsync(
       *depth_img_ptr, &depth_image_, get_logger(),
       *cuda_stream_))
   {
@@ -1030,7 +1033,7 @@ bool NvbloxNode::processDepthImage(const ImageTypeVariant & depth_msg)
     return false;
   }
   if (mask_img_opt) {
-    if (!conversions::monoImageFromImageBufferAsync(
+    if (!conversions::monoImageFromNitrosViewAsync(
         *mask_img_opt.value(), &mask_image_, get_logger(),
         *cuda_stream_))
     {
@@ -1179,11 +1182,11 @@ bool NvbloxNode::processColorImage(const ImageTypeVariant & color_msg)
   auto [color_img_ptr, color_camera_info_msg, mask_img_opt,
     mask_camera_info_opt] = decomposeImageTypeVariant(color_msg);
 
-  const std::string color_frame = color_img_ptr->header.frame_id;
+  const std::string color_frame = color_img_ptr->frame_id;
   std::string mask_frame;
   rclcpp::Time mask_image_timestamp;
   if (mask_img_opt) {
-    mask_frame = (*mask_img_opt)->header.frame_id;
+    mask_frame = (*mask_img_opt)->frame_id;
     mask_image_timestamp = getTimestamp(*mask_img_opt.value());
   }
 
@@ -1223,7 +1226,7 @@ bool NvbloxNode::processColorImage(const ImageTypeVariant & color_msg)
   const Camera color_camera = conversions::cameraFromMessage(*color_camera_info_msg);
 
   // Convert the color image.
-  if (!conversions::colorImageFromImageBufferAsync(
+  if (!conversions::colorImageFromNitrosViewAsync(
       *color_img_ptr, &color_image_, get_logger(),
       *cuda_stream_))
   {
@@ -1231,7 +1234,7 @@ bool NvbloxNode::processColorImage(const ImageTypeVariant & color_msg)
     return false;
   }
   if (mask_img_opt) {
-    if (!conversions::monoImageFromImageBufferAsync(
+    if (!conversions::monoImageFromNitrosViewAsync(
         *mask_img_opt.value(), &mask_image_, get_logger(),
         *cuda_stream_))
     {

@@ -79,32 +79,32 @@ class IsaacROSNvBloxTest(IsaacROSBaseTest):
 
     @IsaacROSBaseTest.for_each_test_case('rosbags')
     def test_nvblox_node(self, test_folder):
-        timeout = 15
-        fpath_ply = '/tmp/super_cool_map.ply'
+        TIMEOUT = 15
+        FPATH_PLY = '/tmp/super_cool_map.ply'
 
         # Create service client for save_ply service
         self.save_ply_cli = self.node.create_client(
             FilePath, '/isaac_ros_test/nvblox_test_srv_save_ply/nvblox_node/save_ply')
 
-        time.sleep(timeout)
+        time.sleep(TIMEOUT)
 
         nvblox_launch_test_utils.check_service_availability(
-            self, self.save_ply_cli, 'save ply', timeout
+            self, self.save_ply_cli, 'save ply', TIMEOUT
         )
         self.save_ply_req = FilePath.Request()
-        self.save_ply_req.file_path = fpath_ply
+        self.save_ply_req.file_path = FPATH_PLY
 
         try:
             done = True
 
             save_ply_response = nvblox_launch_test_utils.get_service_response(
-                self, self.save_ply_cli, self.save_ply_req, 'save ply', timeout
+                self, self.save_ply_cli, self.save_ply_req, 'save ply', TIMEOUT
             )
 
             done = (
                 done and
                 nvblox_launch_test_utils.is_service_succeeded(
-                    self, save_ply_response, 'save ply', fpath_ply
+                    self, save_ply_response, 'save ply', FPATH_PLY
                 )
             )
 
@@ -112,5 +112,5 @@ class IsaacROSNvBloxTest(IsaacROSBaseTest):
                 done, 'Save ply service did not run successfully')
 
         finally:
-            if os.path.exists(fpath_ply):
-                os.remove(fpath_ply)
+            if os.path.exists(FPATH_PLY):
+                os.remove(FPATH_PLY)

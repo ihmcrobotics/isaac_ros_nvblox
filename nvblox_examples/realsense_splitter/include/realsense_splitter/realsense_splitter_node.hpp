@@ -18,10 +18,10 @@
 #ifndef REALSENSE_SPLITTER__REALSENSE_SPLITTER_NODE_HPP_
 #define REALSENSE_SPLITTER__REALSENSE_SPLITTER_NODE_HPP_
 
-#include <memory>
+#include <message_filters/subscriber.h>
+#include <message_filters/sync_policies/exact_time.h>
 
-#include <message_filters/subscriber.hpp>
-#include <message_filters/sync_policies/exact_time.hpp>
+#include <memory>
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>

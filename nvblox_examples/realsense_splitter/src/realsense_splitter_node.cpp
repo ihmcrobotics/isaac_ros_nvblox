@@ -37,16 +37,17 @@ RealsenseSplitterNode::RealsenseSplitterNode(const rclcpp::NodeOptions & options
   const rclcpp::QoS output_qos =
     isaac_ros::common::AddQosParameter(*this, kDefaultQoS, "output_qos")
     .keep_last(kOutputQueueSize);
+  const rmw_qos_profile_t input_qos_profile = input_qos.get_rmw_qos_profile();
 
   // Subscribe to synchronized depth + cam_info topics
-  infra_1_sub_.subscribe(this, "input/infra_1", input_qos);
-  infra_1_metadata_sub_.subscribe(this, "input/infra_1_metadata", input_qos);
-  infra_2_sub_.subscribe(this, "input/infra_2", input_qos);
-  infra_2_metadata_sub_.subscribe(this, "input/infra_2_metadata", input_qos);
-  depth_sub_.subscribe(this, "input/depth", input_qos);
-  depth_metadata_sub_.subscribe(this, "input/depth_metadata", input_qos);
-  pointcloud_sub_.subscribe(this, "input/pointcloud", input_qos);
-  pointcloud_metadata_sub_.subscribe(this, "input/pointcloud_metadata", input_qos);
+  infra_1_sub_.subscribe(this, "input/infra_1", input_qos_profile);
+  infra_1_metadata_sub_.subscribe(this, "input/infra_1_metadata", input_qos_profile);
+  infra_2_sub_.subscribe(this, "input/infra_2", input_qos_profile);
+  infra_2_metadata_sub_.subscribe(this, "input/infra_2_metadata", input_qos_profile);
+  depth_sub_.subscribe(this, "input/depth", input_qos_profile);
+  depth_metadata_sub_.subscribe(this, "input/depth_metadata", input_qos_profile);
+  pointcloud_sub_.subscribe(this, "input/pointcloud", input_qos_profile);
+  pointcloud_metadata_sub_.subscribe(this, "input/pointcloud_metadata", input_qos_profile);
 
   timesync_infra_1_.reset(
     new message_filters::Synchronizer<image_time_policy_t>(

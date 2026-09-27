@@ -32,7 +32,9 @@ from sensor_msgs.msg import Image
 class SemanticConverter(Node):
 
     def __init__(self) -> None:
-        """Convert IsaacSim Semantic Labels to a consistent semantic segmentation image."""
+        '''
+        Helper node to convert IsaacSim Semantic Labels to a consistent semantic segmentation image
+        '''
         super().__init__('semantic_label_converter')
 
         # Declare params
@@ -53,8 +55,8 @@ class SemanticConverter(Node):
         # how label names are converted to ids and color
         self.label_conversion_dict = {}
         for label_name in label_names:
-            output_id_param_name = f'labels.{label_name}.output_id'
-            output_color_param_name = f'labels.{label_name}.output_color'
+            output_id_param_name = f"labels.{label_name}.output_id"
+            output_color_param_name = f"labels.{label_name}.output_color"
 
             self.declare_parameter(output_id_param_name, 0)
             self.declare_parameter(output_color_param_name, [0, 0, 0])
@@ -78,22 +80,22 @@ class SemanticConverter(Node):
         self.bridge = CvBridge()
 
     def init_camera(self, camera_name: str) -> None:
-        """Initialize publishers and subscribers for a camera.
-
+        '''
+        Initialize publishers and subscribers for a camera
         Args:
             camera_name (str): The name of the camera
-        """
+        '''
         # Subscriber
         image_subscriber = message_filters.Subscriber(
-            self, Image, f'/{camera_name}/semantics/ground_truth')
+            self, Image, f"/{camera_name}/semantics/ground_truth")
         labels_subscriber = message_filters.Subscriber(
-            self, SemanticLabelsStamped, f'/semantic_conversion/{camera_name}/labels_stamped')
+            self, SemanticLabelsStamped, f"/semantic_conversion/{camera_name}/labels_stamped")
 
         # Publisher
         publisher_mono8 = self.create_publisher(
-            Image, f'/semantic_conversion/{camera_name}/semantic_mono8', 1)
+            Image, f"/semantic_conversion/{camera_name}/semantic_mono8", 1)
         publisher_colorized = self.create_publisher(
-            Image, f'/semantic_conversion/{camera_name}/semantic_colorized', 1)
+            Image, f"/semantic_conversion/{camera_name}/semantic_colorized", 1)
 
         # Synchronized callback
         def on_camera_image_received(image_msg, label_msg):
@@ -105,14 +107,15 @@ class SemanticConverter(Node):
 
     def on_image_received(self, publisher_mono8, publisher_colorized, image_msg: Image,
                           labels_msg: SemanticLabelsStamped) -> None:
-        """Convert a semantic image from IsaacSim to a consistent label image in mono8.
+        '''
+        Callback to convert semantic image from IsaacSim to a consistent label image in mono8
 
         Args:
             image_msg (Image): Input image from Isaacsim, is in CV16SC1 format and labels id
                 vary with scene
             labels_msg (SemanticLabelsStamped): Stamped input labels message for the current
                 image.
-        """
+        '''
         # Load the labels as a json
         labels_dict = json.loads(labels_msg.labels)
         # Build LUT for color conversions
@@ -127,25 +130,24 @@ class SemanticConverter(Node):
             labels = np.take(lut_labels, data_mono8)
             colors = np.take(lut_colors, data_mono8, 0).squeeze()
         except Exception as e:
-            print('Exception raised in semantic label converter:\n', e)
-            print('WARNING: We will skip this semantic image and label pair.')
+            print("Exception raised in semantic label converter:\n", e)
+            print("WARNING: We will skip this semantic image and label pair.")
             return
 
         # Convert back to image messages and publish
         labels_msg = self.bridge.cv2_to_imgmsg(labels, 'mono8')
         labels_msg.header = image_msg.header
-        colors_msg = self.bridge.cv2_to_imgmsg(colors, 'rgb8')
+        colors_msg = self.bridge.cv2_to_imgmsg(colors, "rgb8")
         colors_msg.header = image_msg.header
         publisher_mono8.publish(labels_msg)
         publisher_colorized.publish(colors_msg)
 
     def build_labels_lut(self, current_labels: Dict[str, Dict[str,
                                                               str]]) -> Tuple[np.array, np.array]:
-        """Build labels lookup table (LUT) from current labels dictionary.
-
-        The dictionary is formatted as {<class_id_0>: {"class": <class_name_x>}} where
-        class_id_x is the id of the class in the image and class_name_x is the one
-        that was entered in the semantics
+        '''
+        Build labels lookup table (LUT) from current labels dictionary. The dictionary is
+        formatted as {<class_id_0>: {"class": <class_name_x>}} where class_id_x is the id of
+        the class in the image and class_name_x is the one that was entered in the semantics
         schema. This lookup maps all classes that are not in the reference as unlabelled, and
         remaps ids / colors of the reference classes to the desired reference one
 
@@ -155,7 +157,7 @@ class SemanticConverter(Node):
         Returns:
             Tuple[np.array, np.array]: LUT for ids (Nx1) and colors (Nx3) where N is the number
             of classes
-        """
+        '''
         # First, get the maximum label that appears in the image
         max_label = -1
         for label_id, _ in current_labels.items():
@@ -173,23 +175,23 @@ class SemanticConverter(Node):
             try:
                 label_id_int = int(label_id)
             except ValueError:
-                if label_id != 'time_stamp':
-                    print('WARNING: Skipping non-numeric label key:', label_id)
+                if label_id != "time_stamp":
+                    print("WARNING: Skipping non-numeric label key:", label_id)
                 continue
             if isinstance(label_name_dict, str):
                 label_name = label_name_dict
             elif isinstance(label_name_dict, dict):
-                label_name = label_name_dict.get('class', None)
+                label_name = label_name_dict.get("class", None)
             else:
-                print('WARNING: value must be str or dict, got:', type(label_name_dict).__name__)
+                print("WARNING: value must be str or dict, got:", type(label_name_dict).__name__)
                 continue
             if label_name is None:
                 continue
             label_name = label_name.lower()
             # Look for the output id / color if if exists
-            target_label = self.label_conversion_dict.get(label_name, {}).get('output_id', 0)
+            target_label = self.label_conversion_dict.get(label_name, {}).get("output_id", 0)
             target_color = self.label_conversion_dict.get(label_name,
-                                                          {}).get('output_color', [0, 0, 0])
+                                                          {}).get("output_color", [0, 0, 0])
             # Update the remap
             lut_labels[label_id_int] = target_label
             lut_colors[label_id_int] = target_color

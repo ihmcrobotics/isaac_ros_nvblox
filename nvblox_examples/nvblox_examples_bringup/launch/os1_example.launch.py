@@ -15,11 +15,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from isaac_ros_launch_utils.all_types import LaunchDescription, SetParameter, IfCondition
 import isaac_ros_launch_utils as lu
-from isaac_ros_launch_utils.all_types import IfCondition, LaunchDescription, SetParameter
 
+from nvblox_ros_python_utils.nvblox_launch_utils import NvbloxMode, NvbloxCamera
 from nvblox_ros_python_utils.nvblox_constants import NVBLOX_CONTAINER_NAME
-from nvblox_ros_python_utils.nvblox_launch_utils import NvbloxCamera, NvbloxMode
 
 # NOTE: This launch file was implemented to run with the DOALS dataset,
 #       which can be downloaded from https://projects.asl.ethz.ch/datasets/doku.php?id=doals

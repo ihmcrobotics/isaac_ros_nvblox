@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-// Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 
+#include "nvblox_ros/nitros_types.hpp"
 #include "nvblox_ros/conversions/image_conversions_thrust.hpp"
 
 namespace nvblox
@@ -89,38 +90,36 @@ void imageMessageFromColorImage(
   sensor_msgs::msg::Image * image_msg, const CudaStream & cuda_stream);
 
 
-/// Convert a ROS image message to a depth frame object, reading the pixel
-/// payload through its rosidl::Buffer (zero-copy for CUDA-backed buffers).
+/// Convert Nitros image message to depth frame object
 ///
 /// Output and staging images will be allocated internally if necessary.
 ///
-/// @param image        Input ROS image message
+/// @param image        Input nitros image message
 /// @param depth_image  Output Nvblox depth image
 /// @param logger       ROS2 logger
 /// @param cuda_stream  Cuda stream used for copying data
 /// @return True on success, False on failure.
-bool depthImageFromImageBufferAsync(
-  const sensor_msgs::msg::Image & image,
+bool depthImageFromNitrosViewAsync(
+  const NitrosView & image,
   DepthImage * depth_image, rclcpp::Logger logger,
   const CudaStream & cuda_stream);
 
-/// Convert a ROS image message to a color frame object, reading the pixel
-/// payload through its rosidl::Buffer (zero-copy for CUDA-backed buffers).
+/// Convert Nitros image message to color frame object
 ///
 /// Output and staging images will be allocated internally if necessary.
 ///
-/// @param image        Input ROS image message
+/// @param image        Input nitros image message
 /// @param color_image  Output Nvblox color image
 /// @param logger       ROS2 logger
 /// @param cuda_stream  Cuda stream used for copying data
 /// @return True on success, False on failure.
-bool colorImageFromImageBufferAsync(
-  const sensor_msgs::msg::Image & image,
+bool colorImageFromNitrosViewAsync(
+  const NitrosView & image,
   ColorImage * color_image,
   rclcpp::Logger logger, const CudaStream & cuda_stream);
 
-bool monoImageFromImageBufferAsync(
-  const sensor_msgs::msg::Image & image, MonoImage * mono_image,
+bool monoImageFromNitrosViewAsync(
+  const NitrosView & image, MonoImage * mono_image,
   rclcpp::Logger logger, const CudaStream & cuda_stream);
 
 }  // namespace conversions

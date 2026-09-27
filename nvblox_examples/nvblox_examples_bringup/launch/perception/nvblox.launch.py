@@ -17,12 +17,12 @@
 
 from typing import List, Tuple
 
-import isaac_ros_launch_utils as lu
 from launch import Action, LaunchDescription
 from launch_ros.descriptions import ComposableNode
+import isaac_ros_launch_utils as lu
 
+from nvblox_ros_python_utils.nvblox_launch_utils import NvbloxMode, NvbloxCamera
 from nvblox_ros_python_utils.nvblox_constants import NVBLOX_CONTAINER_NAME
-from nvblox_ros_python_utils.nvblox_launch_utils import NvbloxCamera, NvbloxMode
 
 
 def get_isaac_sim_remappings(mode: NvbloxMode, num_cameras: int,

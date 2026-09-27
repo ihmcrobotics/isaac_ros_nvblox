@@ -195,19 +195,19 @@ def add_segmentation(args: lu.ArgumentContainer) -> List[Action]:
     # For each camera input, launch a segmentation node.
     # It works for both unsync and HW-sync cameras.
     assert len(args.namespace_list) == len(args.input_topic_list), \
-        'Number of namespace must match number of input topic list!'
+        "Number of namespace must match number of input topic list!"
     assert len(args.input_camera_info_topic_list) == len(args.input_topic_list), \
-        'Number of input camera info topic list must match number of input topic list!'
+        "Number of input camera info topic list must match number of input topic list!"
     assert len(args.output_resized_image_topic_list) == len(args.input_topic_list), \
-        'Number of output resized image topic list must match number of input topic list!'
+        "Number of output resized image topic list must match number of input topic list!"
     assert len(args.output_resized_camera_info_topic_list) == len(args.input_topic_list), \
-        'Number of output resized camera info topic list must match number of input topic list!'
+        "Number of output resized camera info topic list must match number of input topic list!"
     assert len(args.input_topic_list) > 0, \
-        'At least one input topic must be provided to people segmentation!'
+        "At least one input topic must be provided to people segmentation!"
     assert args.num_cameras > 0, \
-        'At least one camera must be enabled to people segmentation!'
+        "At least one camera must be enabled to people segmentation!"
     assert args.num_cameras <= len(args.input_topic_list), \
-        'Number of input topics must not be less than number of cameras!'
+        "Number of input topics must not be less than number of cameras!"
     actions = []
     if args.run_standalone and not args.one_container_per_camera:
         actions.append(lu.component_container(args.container_name))
@@ -274,10 +274,14 @@ def generate_launch_description() -> LaunchDescription:
                  description='Full path to vanilla model TRT engine')
     args.add_arg('input_tensor_names', '["input_tensor"]',
                  description='List of TRT input tensor names')
+    args.add_arg('input_tensor_formats', '["nitros_tensor_list_nchw_rgb_f32"]',
+                 description='List of TRT input tensor nitros type formats')
     args.add_arg('output_tensor_names', '["output_tensor"]',
                  description='List of TRT output tensor names')
     args.add_arg('output_binding_names', '["argmax_1"]',
                  description='List of TRT output tensor binding names')
+    args.add_arg('output_tensor_formats', '["nitros_tensor_list_nhwc_rgb_f32"]',
+                 description='List of TRT output tensor nitros type formats')
     # U-Net Decoder parameters
     args.add_arg('network_output_type', 'argmax')
     args.add_arg('color_segmentation_mask_encoding', 'rgb8')

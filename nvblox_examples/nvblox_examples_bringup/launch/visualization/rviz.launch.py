@@ -17,11 +17,11 @@
 
 import pathlib
 
-import isaac_ros_launch_utils as lu
 from launch import Action, LaunchDescription
 from launch_ros.actions import Node
+import isaac_ros_launch_utils as lu
 
-from nvblox_ros_python_utils.nvblox_launch_utils import NvbloxCamera, NvbloxMode
+from nvblox_ros_python_utils.nvblox_launch_utils import NvbloxMode, NvbloxCamera
 
 
 def add_rviz(args: lu.ArgumentContainer) -> list[Action]:
@@ -41,13 +41,13 @@ def add_rviz(args: lu.ArgumentContainer) -> list[Action]:
             camera_str = 'realsense'
 
         if mode is NvbloxMode.people_detection:
-            rviz_config_name = camera_str + '_people_detection_example.rviz'
+            rviz_config_name = camera_str + "_people_detection_example.rviz"
         elif mode is NvbloxMode.people_segmentation:
-            rviz_config_name = camera_str + '_people_segmentation_example.rviz'
+            rviz_config_name = camera_str + "_people_segmentation_example.rviz"
         elif mode is NvbloxMode.dynamic:
-            rviz_config_name = camera_str + '_dynamics_example.rviz'
+            rviz_config_name = camera_str + "_dynamics_example.rviz"
         else:
-            rviz_config_name = camera_str + '_example.rviz'
+            rviz_config_name = camera_str + "_example.rviz"
 
         rviz_config_path = lu.get_path('nvblox_examples_bringup',
                                        'config/visualization/' + rviz_config_name)
@@ -56,10 +56,10 @@ def add_rviz(args: lu.ArgumentContainer) -> list[Action]:
     assert rviz_config_path.exists(), f'Rviz config {rviz_config_path} does not exist.'
     actions.append(
         Node(
-            package='rviz2',
-            executable='rviz2',
-            arguments=['-d', str(rviz_config_path)],
-            output='screen'))
+            package="rviz2",
+            executable="rviz2",
+            arguments=["-d", str(rviz_config_path)],
+            output="screen"))
     return actions
 
 

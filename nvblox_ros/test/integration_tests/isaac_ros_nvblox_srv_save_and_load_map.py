@@ -79,8 +79,8 @@ class IsaacROSNvBloxTest(IsaacROSBaseTest):
 
     @IsaacROSBaseTest.for_each_test_case('rosbags')
     def test_nvblox_node(self, test_folder):
-        timeout = 10
-        fpath_map = '/tmp/super_cool_map.nvblx'
+        TIMEOUT = 10
+        FPATH_MAP = '/tmp/super_cool_map.nvblx'
 
         # Create service client for save_map service
         self.save_map_cli = self.node.create_client(
@@ -89,48 +89,48 @@ class IsaacROSNvBloxTest(IsaacROSBaseTest):
         self.load_map_cli = self.node.create_client(
             FilePath, '/isaac_ros_test/nvblox_test_srv_save_and_load_map/nvblox_node/load_map')
 
-        time.sleep(timeout)
+        time.sleep(TIMEOUT)
 
         # Check if the save map service is available
         nvblox_launch_test_utils.check_service_availability(
-            self, self.save_map_cli, 'save map', timeout
+            self, self.save_map_cli, 'save map', TIMEOUT
         )
         self.save_map_req = FilePath.Request()
-        self.save_map_req.file_path = fpath_map
+        self.save_map_req.file_path = FPATH_MAP
 
         # Check if the load map service is available
         nvblox_launch_test_utils.check_service_availability(
-            self, self.load_map_cli, 'load map', timeout
+            self, self.load_map_cli, 'load map', TIMEOUT
         )
         self.load_map_req = FilePath.Request()
-        self.load_map_req.file_path = fpath_map
+        self.load_map_req.file_path = FPATH_MAP
 
         try:
             done = True
 
             save_map_response = nvblox_launch_test_utils.get_service_response(
-                self, self.save_map_cli, self.save_map_req, 'save map', timeout
+                self, self.save_map_cli, self.save_map_req, 'save map', TIMEOUT
             )
 
-            time.sleep(timeout / 5)
+            time.sleep(TIMEOUT / 5)
 
             load_map_response = nvblox_launch_test_utils.get_service_response(
-                self, self.load_map_cli, self.load_map_req, 'load map', timeout
+                self, self.load_map_cli, self.load_map_req, 'load map', TIMEOUT
             )
 
             # Getting result
             done = (
                 done and
                 nvblox_launch_test_utils.is_service_succeeded(
-                    self, save_map_response, 'save map', fpath_map
+                    self, save_map_response, 'save map', FPATH_MAP
                 ) and
                 nvblox_launch_test_utils.is_service_succeeded(
-                    self, load_map_response, 'load map', fpath_map
+                    self, load_map_response, 'load map', FPATH_MAP
                 )
             )
 
             self.assertTrue(done, 'Save map or Load map service did not run successfully')
 
         finally:
-            if os.path.exists(fpath_map):
-                os.remove(fpath_map)
+            if os.path.exists(FPATH_MAP):
+                os.remove(FPATH_MAP)

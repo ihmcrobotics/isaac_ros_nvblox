@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,18 +35,10 @@ message( STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}" )
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-
-# rviz (and Qt) are unavailable in minimal/headless environments (e.g. the
-# ROS 2 Lyrical dev container). Build this plugin only when rviz is present.
-find_package(rviz_common QUIET)
-if(NOT rviz_common_FOUND)
-  message(STATUS "rviz_common not found - skipping ${PROJECT_NAME}")
-  ament_package()
-  return()
-endif()
-
+find_package(rviz_common REQUIRED)
 find_package(rviz_rendering REQUIRED)
 find_package(rviz_ogre_vendor REQUIRED)
+find_package(Qt5Widgets REQUIRED)
 find_package(rviz_default_plugins REQUIRED)
 find_package(nvblox_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
@@ -63,17 +55,17 @@ add_library(${PROJECT_NAME} SHARED
   src/nvblox_plugin_display.cpp
   src/nvblox_plugin_visual.cpp
 )
-# This ROS distro drops ament_target_dependencies; link the modern imported
-# targets directly. ${<pkg>_TARGETS} carries the generated message libraries
-# and their transitive include dirs.
 target_link_libraries(${PROJECT_NAME} PUBLIC
   rviz_ogre_vendor::OgreMain
   rviz_ogre_vendor::OgreOverlay
-  ${nvblox_msgs_TARGETS}
-  rviz_common::rviz_common
-  rviz_rendering::rviz_rendering
-  pluginlib::pluginlib
-  rviz_default_plugins::rviz_default_plugins
+)
+ament_target_dependencies(${PROJECT_NAME} PUBLIC
+  nvblox_msgs
+  rviz_common
+  rviz_rendering
+  pluginlib
+  rviz_ogre_vendor
+  rviz_default_plugins
 )
 
 
@@ -88,6 +80,7 @@ target_compile_definitions(${PROJECT_NAME}  PUBLIC "PLUGINLIB__DISABLE_BOOST_FUN
 ament_export_include_directories(include)
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_dependencies(
+  Qt5Widgets
   rviz_common
   rviz_rendering
   rviz_ogre_vendor

@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,10 +31,12 @@ find_package(CUDAToolkit REQUIRED)
 add_library(${PROJECT_NAME}_lib SHARED
   src/check_cuda_errors.cpp
 )
-# This ROS distro drops ament_target_dependencies; link the modern imported
-# targets directly.
-target_link_libraries(${PROJECT_NAME}_lib PUBLIC
-  rclcpp::rclcpp
+ament_target_dependencies(${PROJECT_NAME}_lib
+  rclcpp
+  CUDAToolkit
+)
+
+target_link_libraries(${PROJECT_NAME}_lib
   CUDA::cudart
 )
 

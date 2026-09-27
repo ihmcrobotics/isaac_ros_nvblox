@@ -44,16 +44,16 @@ def setup_record_bag(args: lu.ArgumentContainer) -> List[Action]:
         realsense_topics.append('/' + name + '/depth/image_rect_raw')
         realsense_topics.append('/' + name + '/depth/camera_info')
 
-    record_action = lu.record_rosbag(topics=' '.join(realsense_topics), bag_path=args.output)
+    record_action = lu.record_rosbag(topics=" ".join(realsense_topics), bag_path=args.output)
 
     recording_started_msg =\
-        """\n\n\n
+        '''\n\n\n
         -----------------------------------------------------
                     BAG RECORDING IS STARTING NOW
 
                  (make sure the realsense node is up)
         -----------------------------------------------------
-        \n\n\n"""
+        \n\n\n'''
 
     # Note(xinjieyao: 2024/08/24): Recording based on multi-rs launch using RealSenseNodeFactory
     # could have siginficant frame drops, fot depth, color, infra, camera_info for topics published

@@ -24,12 +24,12 @@ def generate_launch_description() -> LaunchDescription:
 
     actions.append(
         Node(
-            package='nvblox_message_adapters',
-            executable='nvblox_voxel_layer_adapter',
-            name='nvblox_voxel_layer_adapter',
-            output='screen',
+            package="nvblox_message_adapters",
+            executable="nvblox_voxel_layer_adapter",
+            name="nvblox_voxel_layer_adapter",
+            output="screen",
             respawn=False,
-            arguments=['--ros-args', '--log-level', 'info'],
+            arguments=["--ros-args", "--log-level", "info"],
             remappings=[('voxel_block_layer', '/nvblox_node/color_layer')],
         ))
 

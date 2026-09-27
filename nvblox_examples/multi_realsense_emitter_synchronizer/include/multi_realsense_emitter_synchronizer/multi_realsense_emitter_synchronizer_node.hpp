@@ -18,14 +18,14 @@
 #ifndef MULTI_REALSENSE_EMITTER_SYNCHRONIZER__MULTI_REALSENSE_EMITTER_SYNCHRONIZER_NODE_HPP_
 #define MULTI_REALSENSE_EMITTER_SYNCHRONIZER__MULTI_REALSENSE_EMITTER_SYNCHRONIZER_NODE_HPP_
 
+#include <message_filters/subscriber.h>
+#include <message_filters/sync_policies/approximate_time.h>
+#include <message_filters/synchronizer.h>
+
 #include <memory>
 #include <string>
 #include <variant>
 #include <vector>
-
-#include <message_filters/subscriber.hpp>
-#include <message_filters/sync_policies/approximate_time.hpp>
-#include <message_filters/synchronizer.hpp>
 
 #include <rclcpp/parameter_client.hpp>
 #include <rclcpp/rclcpp.hpp>
