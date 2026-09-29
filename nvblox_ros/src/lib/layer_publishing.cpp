@@ -1,4 +1,3 @@
-#include "nvblox/geometry/bounding_spheres.h"
 // SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
 // Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
@@ -548,80 +547,12 @@ void publishVoxelLayerUsingPlugin(
   publish_timer.Stop();
 }
 
-void LayerPublisher::resetMeshArchive()
-{
-  retained_mesh_.clear();
-  archived_mesh_.clear();
-  mesh_subscriber_count_ = 0;
-}
-
-void LayerPublisher::archiveOutsideRadius(
-  std::shared_ptr<Mapper> mapper, const Vector3f & center, float radius,
-  const std::string & frame, const rclcpp::Time & stamp, const rclcpp::Logger & logger)
-{
-  archive_enabled_ = true;
-  const auto indices = getBlocksOutsideRadius(mapper->tsdf_layer().getAllBlockIndices(),
-                                              mapper->tsdf_layer().block_size(), center, radius);
-  if (indices.empty()) {return;}
-  // Finish meshing and synchronously copy outgoing blocks before GPU deallocation.
-  // Explicit indices and unlimited bandwidth ensure no outgoing block is skipped.
-  mapper->updateColorMesh();
-  mapper->serializeSelectedLayers(LayerType::kColorMesh, -1.0f, BlockExclusionParams(), indices);
-  publishMesh(mapper->serializedColorMeshLayer(), {}, mapper->tsdf_layer().block_size(),
-              frame, stamp, logger);
-  for (const auto & i : indices) {archived_mesh_.insert({i.x(), i.y(), i.z()});}
-}
-
 void LayerPublisher::publishMesh(
   std::shared_ptr<SerializedColorMeshLayer> serialized_mesh,
   const std::vector<Index3D> & blocks_to_remove, const float block_size,
   const std::string & frame_id, const rclcpp::Time & timestamp,
   const rclcpp::Logger & logger)
 {
-  if (archive_enabled_) {
-    nvblox_msgs::msg::Mesh update;
-    conversions::meshMessageFromSerializedMesh(serialized_mesh, timestamp, frame_id,
-                                               block_size, false, &update);
-    for (size_t j = 0; j < update.block_indices.size(); ++j) {
-      const auto & i = update.block_indices[j];
-      const MeshKey key{i.x, i.y, i.z};
-      archived_mesh_.erase(key);
-      // Empty blocks replace obsolete geometry when a region is revisited.
-      retained_mesh_[key] = update.blocks[j];
-    }
-    std::vector<Index3D> deletions;
-    for (const auto & i : blocks_to_remove) {
-      const MeshKey key{i.x(), i.y(), i.z()};
-      if (archived_mesh_.count(key)) {continue;}
-      retained_mesh_.erase(key);
-      deletions.push_back(i);
-    }
-    const auto subscribers = mesh_publisher_->get_subscription_count();
-    if (subscribers > mesh_subscriber_count_) {
-      // Replay a complete snapshot including archived regions for a new viewer.
-      nvblox_msgs::msg::Mesh replay;
-      replay.header = update.header;
-      replay.block_size_m = block_size;
-      replay.clear = true;
-      for (const auto & entry : retained_mesh_) {
-        nvblox_msgs::msg::Index3D i;
-        i.x = entry.first[0]; i.y = entry.first[1]; i.z = entry.first[2];
-        replay.block_indices.push_back(i);
-        replay.blocks.push_back(entry.second);
-      }
-      mesh_publisher_->publish(replay);
-    } else if (subscribers > 0) {
-      if (!deletions.empty()) {
-        nvblox_msgs::msg::Mesh removed;
-        conversions::meshMessageFromBlocksToDelete(deletions, timestamp, frame_id,
-                                                   block_size, &removed);
-        mesh_publisher_->publish(removed);
-      }
-      if (!update.blocks.empty()) {mesh_publisher_->publish(update);}
-    }
-    mesh_subscriber_count_ = subscribers;
-    return;
-  }
   bool serialize_full_mesh = false;
   size_t new_subscriber_count = mesh_publisher_->get_subscription_count();
 
@@ -667,7 +598,6 @@ LayerPublisher::LayerPublisher(
   exclusion_height_m_(exclusion_height_m),
   exclusion_radius_m_(exclusion_radius_m)
 {
-  archive_enabled_ = node->get_parameter("map_clearing_radius_m").as_double() > 0.0;
   // Mesh publishers
   mesh_publisher_ = node->create_publisher<nvblox_msgs::msg::Mesh>("~/mesh", 1);
 
@@ -757,7 +687,6 @@ void LayerPublisher::serializeAndpublishSubscribedLayers(
 
   CHECK_NOTNULL(static_mapper);
   LayerTypeBitMask layers_to_stream = getLayersToStreamBitMask();
-  if (archive_enabled_) {layers_to_stream |= LayerType::kColorMesh;}
 
   /// Mesh is only computed when we're serializing
   if (layers_to_stream & LayerType::kColorMesh) {

@@ -1570,8 +1570,6 @@ void NvbloxNode::clearMapOutsideOfRadiusOfLastKnownPose()
         params_.map_clearing_frame_id, rclcpp::Time(0),
         &T_L_MC))
     {
-      layer_publisher_->archiveOutsideRadius(static_mapper_, T_L_MC.translation(),
-        params_.map_clearing_radius_m, params_.global_frame, now(), get_logger());
       static_mapper_->clearOutsideRadius(T_L_MC.translation(), params_.map_clearing_radius_m);
     } else {
       RCLCPP_INFO_STREAM_THROTTLE(
@@ -1701,7 +1699,6 @@ void NvbloxNode::loadMap(
       }
 
       service_response->success = node->static_mapper_->loadMap(filename);
-      if (service_response->success) {node->layer_publisher_->resetMeshArchive();}
       if (service_response->success) {
         RCLCPP_INFO_STREAM(node->get_logger(), "Loaded map to file from " << filename);
       } else {
