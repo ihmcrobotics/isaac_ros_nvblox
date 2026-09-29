@@ -214,6 +214,8 @@ void NvbloxNode::initializeMultiMapper()
   //              and these handles wouldn't be needed.
   static_mapper_ = multi_mapper_.get()->background_mapper();
   dynamic_mapper_ = multi_mapper_.get()->foreground_mapper();
+  // This parameter samples the maintained field; it does not change integration.
+  declare_parameter<double>("visualization_slice_height", static_mapper_->esdf_integrator().esdf_slice_height());
 }
 
 void NvbloxNode::subscribeToTopics()
@@ -778,7 +780,8 @@ void NvbloxNode::processEsdf()
   }
   esdf_integration_timer.Stop();
 
-  if (params_.esdf_mode == EsdfMode::k2D) {
+  {
+    // A 3D ESDF can also be sampled as a horizontal distance image.
     timing::Timer esdf_output_timer("ros/esdf/slice_output");
 
     sliceAndPublishEsdf(
@@ -814,6 +817,10 @@ void NvbloxNode::sliceAndPublishEsdf(
   const rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr & occupancy_grid_publisher,
   const float unknown_value, const Mapper * mapper_2)
 {
+  const float slice_height = params_.esdf_mode == EsdfMode::k3D ?
+    static_cast<float>(get_parameter("visualization_slice_height").as_double()) :
+    mapper->esdf_integrator().esdf_slice_height();
+  if (!std::isfinite(slice_height)) return;
   // If anyone wants a slice
   if (pointcloud_publisher->get_subscription_count() > 0 ||
     (params_.publish_esdf_distance_slice && slice_publisher->get_subscription_count() > 0) ||
@@ -826,12 +833,12 @@ void NvbloxNode::sliceAndPublishEsdf(
     if (mapper_2 != nullptr) {
       esdf_slicer_.sliceLayersToCombinedDistanceImage(
         mapper->esdf_layer(), mapper_2->esdf_layer(),
-        mapper->esdf_integrator().esdf_slice_height(),
-        mapper_2->esdf_integrator().esdf_slice_height(), unknown_value, &aabb, &map_slice_image);
+        slice_height,
+        slice_height, unknown_value, &aabb, &map_slice_image);
     } else {
       esdf_slicer_.sliceLayerToDistanceImage(
         mapper->esdf_layer(),
-        mapper->esdf_integrator().esdf_slice_height(), unknown_value,
+        slice_height, unknown_value,
         &aabb, &map_slice_image);
     }
     slicing_timer.Stop();
@@ -841,7 +848,7 @@ void NvbloxNode::sliceAndPublishEsdf(
       timing::Timer pointcloud_msg_timer("ros/" + name + "/esdf/output/pointcloud");
       sensor_msgs::msg::PointCloud2 pointcloud_msg;
       esdf_slice_converter_.pointcloudMsgFromSliceImage(
-        map_slice_image, aabb, mapper->esdf_integrator().esdf_slice_height(),
+        map_slice_image, aabb, slice_height,
         mapper->esdf_layer().voxel_size(),
         unknown_value, &pointcloud_msg);
       pointcloud_msg.header.frame_id = params_.global_frame.get();
@@ -854,7 +861,7 @@ void NvbloxNode::sliceAndPublishEsdf(
       timing::Timer slice_msg_timer("ros/" + name + "/esdf/output/slice");
       nvblox_msgs::msg::DistanceMapSlice map_slice_msg;
       esdf_slice_converter_.distanceMapSliceMsgFromSliceImage(
-        map_slice_image, aabb, mapper->esdf_integrator().esdf_slice_height(),
+        map_slice_image, aabb, slice_height,
         mapper->voxel_size_m(), unknown_value,
         &map_slice_msg);
       map_slice_msg.header.frame_id = params_.global_frame.get();
@@ -1563,6 +1570,8 @@ void NvbloxNode::clearMapOutsideOfRadiusOfLastKnownPose()
         params_.map_clearing_frame_id, rclcpp::Time(0),
         &T_L_MC))
     {
+      layer_publisher_->archiveOutsideRadius(static_mapper_, T_L_MC.translation(),
+        params_.map_clearing_radius_m, params_.global_frame, now(), get_logger());
       static_mapper_->clearOutsideRadius(T_L_MC.translation(), params_.map_clearing_radius_m);
     } else {
       RCLCPP_INFO_STREAM_THROTTLE(
@@ -1692,6 +1701,7 @@ void NvbloxNode::loadMap(
       }
 
       service_response->success = node->static_mapper_->loadMap(filename);
+      if (service_response->success) {node->layer_publisher_->resetMeshArchive();}
       if (service_response->success) {
         RCLCPP_INFO_STREAM(node->get_logger(), "Loaded map to file from " << filename);
       } else {

@@ -19,6 +19,9 @@
 #define NVBLOX_ROS__LAYER_PUBLISHING_HPP_
 
 #include <memory>
+#include <map>
+#include <set>
+#include <array>
 #include <string>
 #include <vector>
 
@@ -62,7 +65,16 @@ public:
     std::shared_ptr<Mapper> static_mapper,
     std::shared_ptr<Mapper> dynamic_mapper, const rclcpp::Logger & logger);
 
+  void archiveOutsideRadius(std::shared_ptr<Mapper> mapper, const Vector3f & center,
+                            float radius, const std::string & frame, const rclcpp::Time & stamp,
+                            const rclcpp::Logger & logger);
+  void resetMeshArchive();
+
 private:
+  using MeshKey = std::array<int, 3>;
+  std::map<MeshKey, nvblox_msgs::msg::MeshBlock> retained_mesh_;
+  std::set<MeshKey> archived_mesh_;
+  bool archive_enabled_ = false;
   /// Determine which layer should be streamed based on active subscribers
   LayerTypeBitMask getLayersToStreamBitMask();
 
