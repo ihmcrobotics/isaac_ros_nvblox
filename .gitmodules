@@ -1,4 +1,4 @@
 [submodule "nvblox_ros/nvblox_core"]
 	path = nvblox_ros/nvblox_core
-	url = https://github.com/nvidia-isaac/nvblox.git
+	url = https://github.com/ihmcrobotics/nvblox.git
 	branch = feature/nvblox-integration
