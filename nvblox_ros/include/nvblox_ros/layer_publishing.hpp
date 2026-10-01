@@ -18,6 +18,7 @@
 #ifndef NVBLOX_ROS__LAYER_PUBLISHING_HPP_
 #define NVBLOX_ROS__LAYER_PUBLISHING_HPP_
 
+#include "nvblox_ros/retained_mesh_archive.hpp"
 #include <memory>
 #include <map>
 #include <set>
@@ -73,7 +74,7 @@ public:
 private:
   using MeshKey = std::array<int, 3>;
   std::map<MeshKey, nvblox_msgs::msg::MeshBlock> retained_mesh_;
-  std::set<MeshKey> archived_mesh_;
+  RetainedMeshArchive<nvblox_msgs::msg::MeshBlock> mesh_archive_;
   bool archive_enabled_ = false;
   /// Determine which layer should be streamed based on active subscribers
   LayerTypeBitMask getLayersToStreamBitMask();

@@ -551,7 +551,7 @@ void publishVoxelLayerUsingPlugin(
 void LayerPublisher::resetMeshArchive()
 {
   retained_mesh_.clear();
-  archived_mesh_.clear();
+  mesh_archive_.clear();
   mesh_subscriber_count_ = 0;
 }
 
@@ -569,7 +569,7 @@ void LayerPublisher::archiveOutsideRadius(
   mapper->serializeSelectedLayers(LayerType::kColorMesh, -1.0f, BlockExclusionParams(), indices);
   publishMesh(mapper->serializedColorMeshLayer(), {}, mapper->tsdf_layer().block_size(),
               frame, stamp, logger);
-  for (const auto & i : indices) {archived_mesh_.insert({i.x(), i.y(), i.z()});}
+  for (const auto & i : indices) {mesh_archive_.freeze({i.x(), i.y(), i.z()});}
 }
 
 void LayerPublisher::publishMesh(
@@ -585,16 +585,25 @@ void LayerPublisher::publishMesh(
     for (size_t j = 0; j < update.block_indices.size(); ++j) {
       const auto & i = update.block_indices[j];
       const MeshKey key{i.x, i.y, i.z};
-      archived_mesh_.erase(key);
-      // Empty blocks replace obsolete geometry when a region is revisited.
+      mesh_archive_.update(key, update.blocks[j]);
+      update.blocks[j] = mesh_archive_.combined(key);
       retained_mesh_[key] = update.blocks[j];
     }
     std::vector<Index3D> deletions;
     for (const auto & i : blocks_to_remove) {
       const MeshKey key{i.x(), i.y(), i.z()};
-      if (archived_mesh_.count(key)) {continue;}
-      retained_mesh_.erase(key);
-      deletions.push_back(i);
+      mesh_archive_.removeActive(key);
+      auto retained = mesh_archive_.combined(key);
+      if (!retained.triangles.empty()) {
+        retained_mesh_[key] = retained;
+        nvblox_msgs::msg::Index3D index;
+        index.x = i.x(); index.y = i.y(); index.z = i.z();
+        update.block_indices.push_back(index);
+        update.blocks.push_back(std::move(retained));
+      } else {
+        retained_mesh_.erase(key);
+        deletions.push_back(i);
+      }
     }
     const auto subscribers = mesh_publisher_->get_subscription_count();
     if (subscribers > mesh_subscriber_count_) {
