@@ -550,7 +550,6 @@ void publishVoxelLayerUsingPlugin(
 
 void LayerPublisher::resetMeshArchive()
 {
-  retained_mesh_.clear();
   mesh_archive_.clear();
   mesh_subscriber_count_ = 0;
 }
@@ -569,7 +568,20 @@ void LayerPublisher::archiveOutsideRadius(
   mapper->serializeSelectedLayers(LayerType::kColorMesh, -1.0f, BlockExclusionParams(), indices);
   publishMesh(mapper->serializedColorMeshLayer(), {}, mapper->tsdf_layer().block_size(),
               frame, stamp, logger);
-  for (const auto & i : indices) {mesh_archive_.freeze({i.x(), i.y(), i.z()});}
+  std::vector<nvblox_msgs::msg::Index3D> outgoing;
+  for (const auto & i : indices) {
+    nvblox_msgs::msg::Index3D index;
+    index.x=i.x(); index.y=i.y(); index.z=i.z(); outgoing.push_back(index);
+  }
+  mesh_archive_.archive(outgoing);
+  // Apply the pending archive delta before GPU clearing or any revisit update.
+  nvblox_msgs::msg::Mesh empty;
+  empty.header.frame_id=frame; empty.header.stamp=stamp;
+  empty.block_size_m=mapper->tsdf_layer().block_size();
+  const auto archived=mesh_archive_.update(empty, {}, stamp.nanoseconds(), false);
+  if (mesh_publisher_->get_subscription_count()>0 && !archived.blocks.empty()) {
+    mesh_publisher_->publish(archived);
+  }
 }
 
 void LayerPublisher::publishMesh(
@@ -582,51 +594,16 @@ void LayerPublisher::publishMesh(
     nvblox_msgs::msg::Mesh update;
     conversions::meshMessageFromSerializedMesh(serialized_mesh, timestamp, frame_id,
                                                block_size, false, &update);
-    for (size_t j = 0; j < update.block_indices.size(); ++j) {
-      const auto & i = update.block_indices[j];
-      const MeshKey key{i.x, i.y, i.z};
-      mesh_archive_.update(key, update.blocks[j]);
-      update.blocks[j] = mesh_archive_.combined(key);
-      retained_mesh_[key] = update.blocks[j];
-    }
-    std::vector<Index3D> deletions;
+    std::vector<nvblox_msgs::msg::Index3D> removed;
     for (const auto & i : blocks_to_remove) {
-      const MeshKey key{i.x(), i.y(), i.z()};
-      mesh_archive_.removeActive(key);
-      auto retained = mesh_archive_.combined(key);
-      if (!retained.triangles.empty()) {
-        retained_mesh_[key] = retained;
-        nvblox_msgs::msg::Index3D index;
-        index.x = i.x(); index.y = i.y(); index.z = i.z();
-        update.block_indices.push_back(index);
-        update.blocks.push_back(std::move(retained));
-      } else {
-        retained_mesh_.erase(key);
-        deletions.push_back(i);
-      }
+      nvblox_msgs::msg::Index3D index;
+      index.x=i.x(); index.y=i.y(); index.z=i.z(); removed.push_back(index);
     }
     const auto subscribers = mesh_publisher_->get_subscription_count();
-    if (subscribers > mesh_subscriber_count_) {
-      // Replay a complete snapshot including archived regions for a new viewer.
-      nvblox_msgs::msg::Mesh replay;
-      replay.header = update.header;
-      replay.block_size_m = block_size;
-      replay.clear = true;
-      for (const auto & entry : retained_mesh_) {
-        nvblox_msgs::msg::Index3D i;
-        i.x = entry.first[0]; i.y = entry.first[1]; i.z = entry.first[2];
-        replay.block_indices.push_back(i);
-        replay.blocks.push_back(entry.second);
-      }
-      mesh_publisher_->publish(replay);
-    } else if (subscribers > 0) {
-      if (!deletions.empty()) {
-        nvblox_msgs::msg::Mesh removed;
-        conversions::meshMessageFromBlocksToDelete(deletions, timestamp, frame_id,
-                                                   block_size, &removed);
-        mesh_publisher_->publish(removed);
-      }
-      if (!update.blocks.empty()) {mesh_publisher_->publish(update);}
+    auto compressed=mesh_archive_.update(update, removed, timestamp.nanoseconds(),
+                                         subscribers > mesh_subscriber_count_);
+    if (subscribers>0 && (compressed.clear || !compressed.blocks.empty())) {
+      mesh_publisher_->publish(compressed);
     }
     mesh_subscriber_count_ = subscribers;
     return;

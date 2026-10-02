@@ -37,6 +37,7 @@
   <depend>geometry_msgs</depend>
   <depend>libstatistics_collector</depend>
   <depend>nvblox_msgs</depend>
+  <depend>kimera_pgmo</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
   <depend>rosbag2_cpp</depend>

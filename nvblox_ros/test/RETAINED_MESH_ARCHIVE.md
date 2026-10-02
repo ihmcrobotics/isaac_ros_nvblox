@@ -1,32 +1,48 @@
-# Local-map archival experiment
+# Standalone compressed mesh archive
 
-This branch separates active block geometry from frozen geometry, following the
-active/archive lifecycle used by Hydra. It does not import Hydra or Kimera-PGMO
-and does not reproduce their mesh-index compression or deformation handling.
+The local-map publisher uses the installed Kimera-PGMO `DeltaCompression` library.
+No Hydra scene graph, GVD extraction or pose-optimization processing is started.
+The existing Kimera-PGMO library links GTSAM/RPGO as build/runtime dependencies.
+No third-party source is copied.
 
-- Mesh outgoing blocks before clearing their GPU voxels (existing behavior).
-- Freeze their CPU triangles before releasing the voxel evidence.
-- Replace active geometry on each update; do not replace frozen geometry merely
-  because the same block coordinate is observed again.
-- Publish the union of frozen and current triangles under the original block key.
-- Suppress exactly coincident triangles, preferring current colors. No approximate
-  vertex welding or cross-block merging is performed.
-- Explicit active-block removal retains frozen geometry; reset clears both.
-- Late subscribers receive the same composed geometry through full archive replay.
+Pipeline:
 
-This deliberately favors geometry retention. Changed scenes can leave stale or
-nearly coincident surfaces. Repeated revisits can increase CPU RAM, message size
-and render cost. It does not reload TSDF evidence or prove that all holes originate
-in the archive. Compare the same recording against the previous branch commit.
-No voxel resolution, fusion parameters, clearing radius or RDX ABI were changed.
+1. Adapt changed indexed nvblox mesh blocks into PGMO's triangle-soup interface.
+2. Compress at 0.005 m (Hydra's configured mesh-compression resolution, distinct
+   from the 0.1 m TSDF voxel size).
+3. Apply MeshDelta vertex/face updates to a persistent indexed CPU mesh.
+4. Before GPU clearing, finalize outgoing mesh, archive its compressor blocks,
+   and apply the pending archival delta.
+5. Group output faces by spatial centroid into nvblox mesh-message blocks.
+   Process newly archived faces once; regenerate active regions and regions that
+   became empty. Previously frozen regions are not republished unless affected
+   or a subscriber needs a full snapshot.
+6. Publish through the existing RViz/RDX interfaces. Output block membership can
+   differ from source TSDF block membership because compression shares vertices.
 
-Standalone contract check (no ROS/GPU required):
+An empty active block or deletion updates the compressor; a post-archival GPU
+removal does not erase frozen faces. Reset clears both the compressor and CPU
+mesh. Repeated observations of active geometry replace it instead of accumulating
+independent triangle copies. The compressor's own archival/revisit behavior is
+used without adding the prior exact-triangle union policy.
 
-```bash
-c++ -std=c++17 -Wall -Wextra -Werror -I nvblox_ros/include \
-  nvblox_ros/test/retained_mesh_archive_test.cpp -o /tmp/archive-test
-/tmp/archive-test
-```
+Limitations:
 
-Checks cover outgoing clearing, empty/partial revisits, active replacement,
-coincident triangles, repeat archival, negative coordinates and reset.
+- Archived geometry still accumulates in RAM; no disk eviction or hard RAM budget.
+- Compression revisits all active geometry and adds CPU cost; no speedup claimed.
+- Archived geometry is not re-fused TSDF evidence. Changed scenes may leave stale
+  geometry. This does not guarantee removal of holes or duplicate revisit surfaces.
+- No deformation or loop-closure optimization. Output normals are omitted, as
+  supported by the existing unlit RGB RViz and RDX viewers.
+- Input fusion settings, 4 m integration distance, 8 m clearing radius and native
+  RDX snapshot ABI are unchanged.
+
+Build the image normally with `./build_image.sh`, then restart `./run_nvblox.sh`.
+The nvblox Docker stage sources the scene-graph underlay to find Kimera-PGMO.
+
+With BUILD_TESTING enabled, CTest target `retained_mesh_archive_test` checks actual
+PGMO compression, shared vertices, partial archival, empty/partial revisits,
+active replacement, incremental viewer reconstruction, late-join replay, invalid
+input, repeated archival, negative coordinates and reset. It requires the installed
+ROS message and PGMO libraries but no GPU execution. Live recording validation and
+CPU/RAM profiling are still required.

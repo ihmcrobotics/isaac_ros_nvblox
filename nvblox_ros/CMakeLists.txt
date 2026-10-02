@@ -85,6 +85,7 @@ find_package(nav_msgs REQUIRED)
 find_package(libstatistics_collector REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(Threads REQUIRED)
+find_package(kimera_pgmo REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(nvblox_ros_common REQUIRED)
@@ -106,6 +107,7 @@ add_library(${PROJECT_NAME}_lib SHARED
   src/lib/conversions/esdf_and_gradients_conversions.cu
   src/lib/conversions/transform_conversions.cpp
   src/lib/layer_publishing.cpp
+  src/lib/retained_mesh_archive.cpp
   src/lib/camera_cache.cpp
   src/lib/visualization.cpp
   src/lib/transformer.cpp
@@ -120,7 +122,7 @@ add_library(${PROJECT_NAME}_lib SHARED
 )
 set_nvblox_compiler_options(${PROJECT_NAME}_lib)
 target_link_libraries(${PROJECT_NAME}_lib PUBLIC nvblox_lib nvblox_eigen nvblox_datasets nvblox_fuser pthread glog)
-target_link_libraries(${PROJECT_NAME}_lib PRIVATE nvblox_gpu_hash nvblox_stdgpu)
+target_link_libraries(${PROJECT_NAME}_lib PRIVATE nvblox_gpu_hash nvblox_stdgpu kimera_pgmo::kimera_pgmo)
 ament_target_dependencies(${PROJECT_NAME}_lib
   PUBLIC
   rclcpp
@@ -258,6 +260,14 @@ if(BUILD_TESTING)
 
   # Integrations tests
   add_subdirectory(test/integration_tests)
+
+  add_executable(retained_mesh_archive_test
+    test/retained_mesh_archive_test.cpp src/lib/retained_mesh_archive.cpp)
+  target_include_directories(retained_mesh_archive_test PRIVATE include)
+  target_link_libraries(retained_mesh_archive_test PRIVATE kimera_pgmo::kimera_pgmo)
+  ament_target_dependencies(retained_mesh_archive_test PUBLIC nvblox_msgs)
+  target_compile_options(retained_mesh_archive_test PRIVATE -UNDEBUG)
+  add_test(NAME retained_mesh_archive_test COMMAND retained_mesh_archive_test)
 
   # Unit Tests
   add_subdirectory(test/unit_tests)
